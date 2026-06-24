@@ -162,68 +162,44 @@ def rule_classify(name: str) -> str:
             return cat
     return ""   # ไม่รู้ → ส่งให้ AI
 
-def classify_all(products, api_key):
-    import time, hashlib
-
-    # ── ขั้น 1: rule-based ก่อน ──
-    result   = {}
-    need_ai  = []
+def classify_rule_only(products):
+    """จำแนกทั้งหมดด้วย rule-based ทันที ไม่ใช้ API"""
+    result = {}
     for p in products:
-        cat = rule_classify(p)
-        if cat:
-            result[p] = cat
-        else:
-            need_ai.append(p)
+        result[p] = rule_classify(p) or "สินค้าเบ็ดเตล็ด"
+    return result
 
-    total = len(products)
-    bar    = st.progress(0)
-    status = st.empty()
-    status.markdown(f"⚡ Rule-based: จำแนกได้ **{len(result)}/{total}** รายการ "
-                    f"| ส่ง AI อีก **{len(need_ai)}** รายการ")
-    bar.progress(len(result)/total if total else 1)
-
+def classify_with_ai(products, api_key, current_map):
+    """ส่งเฉพาะที่ยังเป็น สินค้าเบ็ดเตล็ด ไปให้ AI วิเคราะห์เพิ่ม"""
+    need_ai = [p for p in products if current_map.get(p) == "สินค้าเบ็ดเตล็ด"
+               and not rule_classify(p)]
     if not need_ai:
-        bar.empty(); status.empty()
-        return result
+        st.info("✅ ทุกรายการจำแนกได้จาก rule-based แล้ว ไม่ต้องใช้ AI เพิ่ม")
+        return current_map
 
-    # ── ขั้น 2: ส่ง AI เฉพาะที่ rule ไม่รู้ ──
+    result = dict(current_map)
     batch_size = 30
-    batches    = [need_ai[i:i+batch_size] for i in range(0, len(need_ai), batch_size)]
-    done_ai    = 0
+    batches = [need_ai[i:i+batch_size] for i in range(0, len(need_ai), batch_size)]
+    bar = st.progress(0); status = st.empty()
 
     for i, batch in enumerate(batches):
-        status.markdown(f"🤖 AI วิเคราะห์ **{done_ai}/{len(need_ai)}** รายการ "
-                        f"(batch {i+1}/{len(batches)})...")
-        retry = 0
-        while retry < 3:
-            try:
-                result.update(claude_classify(batch, api_key))
-                done_ai += len(batch)
+        status.markdown(f"🤖 AI วิเคราะห์ **{i*batch_size+len(batch)}/{len(need_ai)}** รายการ...")
+        try:
+            result.update(claude_classify(batch, api_key))
+        except Exception as e:
+            err = str(e)
+            if "429" in err or "quota" in err.lower():
+                st.warning(f"⚠️ Rate limit ถึงขีดจำกัดแล้ว ({len(need_ai)-i*batch_size} รายการที่เหลือใช้ rule-based แทน)")
                 break
-            except Exception as e:
-                err = str(e)
-                if "429" in err or "quota" in err.lower():
-                    wait = (retry + 1) * 20
-                    status.markdown(f"⏳ Rate limit — รอ **{wait} วิ** (retry {retry+1}/3)...")
-                    time.sleep(wait)
-                    retry += 1
-                else:
-                    # error อื่น → fallback rule แล้วไปต่อ
-                    st.warning(f"Batch {i+1}: {err[:150]}")
-                    for p in batch: result[p] = rule_classify(p) or "สินค้าเบ็ดเตล็ด"
-                    done_ai += len(batch)
-                    break
-        else:
-            # retry หมด → rule fallback
-            for p in batch: result[p] = rule_classify(p) or "สินค้าเบ็ดเตล็ด"
-            done_ai += len(batch)
-
-        bar.progress((len(result))/total)
-        if i < len(batches)-1:
-            time.sleep(2)
+            else:
+                st.warning(f"Batch {i+1}: {err[:150]}")
+        bar.progress((i+1)/len(batches))
 
     bar.empty(); status.empty()
     return result
+
+def classify_all(products, api_key):
+    return classify_rule_only(products)
 
 def make_summary(items):
     grp = items.groupby("ประเภทสินค้า")
@@ -535,11 +511,23 @@ with left:
             st.error(f"❌ {e}"); st.stop()
 
     if st.session_state.df is not None and not st.session_state.analyzed:
-        if st.button("🤖  วิเคราะห์ประเภทสินค้า", type="primary", use_container_width=True):
+        if st.button("⚡  จำแนกสินค้าทันที (Rule-based)", type="primary", use_container_width=True):
             products = st.session_state.df["ชื่อสินค้า"].dropna().unique().tolist()
-            st.session_state.cat_map  = classify_all(products, api_key)
+            st.session_state.cat_map  = classify_rule_only(products)
             st.session_state.analyzed = True
             st.rerun()
+
+    if st.session_state.analyzed:
+        products = st.session_state.df["ชื่อสินค้า"].dropna().unique().tolist()
+        need_ai  = [p for p in products
+                    if st.session_state.cat_map.get(p) == "สินค้าเบ็ดเตล็ด"
+                    and not rule_classify(p)]
+        if need_ai:
+            st.info(f"มี **{len(need_ai)}** รายการที่ไม่แน่ใจ สามารถส่ง AI วิเคราะห์เพิ่มได้")
+            if st.button("🤖  วิเคราะห์เพิ่มด้วย AI (Gemini)", use_container_width=True):
+                new_map = classify_with_ai(products, api_key, st.session_state.cat_map)
+                st.session_state.cat_map = new_map
+                st.rerun()
 
     if st.session_state.analyzed:
         sec("หมวดหมู่สินค้า", "🏷️")
