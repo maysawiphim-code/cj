@@ -1,15 +1,18 @@
 import streamlit as st
 import pandas as pd
 import json, re, io, urllib.request
+import numpy as np
+
+# matplotlib ต้อง set backend ก่อน import อื่นๆ
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
-import numpy as np
+from matplotlib.patches import FancyBboxPatch
+
 from openpyxl import load_workbook
 from openpyxl.drawing.image import Image as XLImage
-from openpyxl.styles import (Font, PatternFill, Alignment,
-                              Border, Side, GradientFill)
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
 st.set_page_config(page_title="CJ Smart Scan", page_icon="🛒", layout="wide")
@@ -114,7 +117,6 @@ RANK_COLORS = ["#FFD700","#C0C0C0","#CD7F32","#FF6B6B","#FF9F43",
                "#48DBFB","#1DD1A1","#A29BFE","#FD79A8","#636E72"]
 
 def draw_cell(ax, x, y, w, h, text, bg, fg, bold=False, fs=10):
-    from matplotlib.patches import FancyBboxPatch
     rect = FancyBboxPatch((x+0.002, y+0.005), w-0.004, h-0.008,
                            boxstyle="round,pad=0.008", linewidth=0,
                            facecolor=bg, clip_on=False)
