@@ -495,40 +495,53 @@ with left:
     sec("อัปโหลดไฟล์ Excel", "📂")
     uploaded = st.file_uploader("ลากไฟล์มาวางหรือกดเลือกไฟล์", type=["xlsx"],
                                  label_visibility="collapsed")
-    if uploaded:
-        try:
-            df_raw = pd.read_excel(uploaded, sheet_name="ใบเสร็จ")
-            drop_cols = [c for c in df_raw.columns
-                         if "หมวด" in c or "ประเภท" in c or "category" in c.lower()]
-            if drop_cols: df_raw = df_raw.drop(columns=drop_cols)
-            st.session_state.df       = df_raw
-            st.session_state.analyzed = False
-            st.session_state.cat_map  = {}
-            n_items  = int(df_raw["ชื่อสินค้า"].notna().sum())
-            n_branch = int(df_raw["รหัสสาขา"].dropna().nunique())
-            st.success(f"✅ โหลดสำเร็จ! พบ **{n_items}** รายการ จาก **{n_branch}** สาขา")
-        except Exception as e:
-            st.error(f"❌ {e}"); st.stop()
 
+    # โหลดเฉพาะเมื่อเปลี่ยนไฟล์ใหม่ ไม่ reset ทุก rerun
+    if uploaded is not None:
+        file_id = f"{uploaded.name}_{uploaded.size}"
+        if st.session_state.get("_file_id") != file_id:
+            try:
+                df_raw = pd.read_excel(uploaded, sheet_name="ใบเสร็จ")
+                drop_cols = [c for c in df_raw.columns
+                             if "หมวด" in c or "ประเภท" in c or "category" in c.lower()]
+                if drop_cols: df_raw = df_raw.drop(columns=drop_cols)
+                st.session_state.df        = df_raw
+                st.session_state.analyzed  = False
+                st.session_state.cat_map   = {}
+                st.session_state._file_id  = file_id
+            except Exception as e:
+                st.error(f"❌ {e}"); st.stop()
+
+    if st.session_state.df is not None:
+        n_items  = int(st.session_state.df["ชื่อสินค้า"].notna().sum())
+        n_branch = int(st.session_state.df["รหัสสาขา"].dropna().nunique())
+        st.success(f"✅ ไฟล์พร้อม — **{n_items}** รายการ จาก **{n_branch}** สาขา")
+
+    # ปุ่มจำแนกทันที
     if st.session_state.df is not None and not st.session_state.analyzed:
-        if st.button("⚡  จำแนกสินค้าทันที (Rule-based)", type="primary", use_container_width=True):
+        if st.button("⚡  จำแนกสินค้าทันที", type="primary", use_container_width=True):
             products = st.session_state.df["ชื่อสินค้า"].dropna().unique().tolist()
             st.session_state.cat_map  = classify_rule_only(products)
             st.session_state.analyzed = True
             st.rerun()
 
-    if st.session_state.analyzed:
+    # ปุ่ม AI เสริม
+    if st.session_state.analyzed and st.session_state.df is not None:
         products = st.session_state.df["ชื่อสินค้า"].dropna().unique().tolist()
         need_ai  = [p for p in products
                     if st.session_state.cat_map.get(p) == "สินค้าเบ็ดเตล็ด"
                     and not rule_classify(p)]
         if need_ai:
-            st.info(f"มี **{len(need_ai)}** รายการที่ไม่แน่ใจ สามารถส่ง AI วิเคราะห์เพิ่มได้")
-            if st.button("🤖  วิเคราะห์เพิ่มด้วย AI (Gemini)", use_container_width=True):
+            st.info(f"มี **{len(need_ai)}** รายการไม่แน่ใจ — กด AI เพื่อเพิ่มความแม่นยำ")
+            if st.button("🤖  วิเคราะห์เพิ่มด้วย Gemini AI", use_container_width=True):
                 new_map = classify_with_ai(products, api_key, st.session_state.cat_map)
                 st.session_state.cat_map = new_map
                 st.rerun()
+        else:
+            if st.session_state.analyzed:
+                st.success("✅ จำแนกครบทุกรายการแล้ว")
 
+    # Legend
     if st.session_state.analyzed:
         sec("หมวดหมู่สินค้า", "🏷️")
         for name, meta in CATEGORIES.items():
