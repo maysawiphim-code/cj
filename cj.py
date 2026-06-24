@@ -521,24 +521,6 @@ with tab1:
                 st.session_state.analyzed = True
                 st.rerun()
 
-        if st.session_state.analyzed and st.session_state.df is not None:
-            prods   = st.session_state.df["ชื่อสินค้า"].dropna().unique().tolist()
-            need_ai = [p for p in prods if st.session_state.cat_map.get(p)=="สินค้าเบ็ดเตล็ด" and not rule_classify(p)]
-            if need_ai:
-                st.info(f"มี **{len(need_ai)}** รายการไม่แน่ใจ")
-                if st.button("🤖 วิเคราะห์เพิ่มด้วย Gemini AI", use_container_width=True, key="btn_ai"):
-                    new_map = classify_with_ai(prods, api_key, st.session_state.cat_map)
-                    st.session_state.cat_map = new_map
-                    still = [p for p in prods if new_map.get(p)=="สินค้าเบ็ดเตล็ด" and not rule_classify(p)]
-                    st.session_state.ai_done = len(still)==0
-                    st.rerun()
-            else:
-                st.success("✅ วิเคราะห์ครบทุกรายการแล้ว 🎉")
-
-            if st.session_state.ai_done:
-                st.success("🎉 AI วิเคราะห์ครบทุกรายการแล้ว!")
-                st.session_state.ai_done = False
-
             sec("หมวดหมู่", "🏷️")
             for name, meta in CATEGORIES.items():
                 st.markdown(
@@ -607,23 +589,6 @@ with tab1:
                     f'</div></div><div class="cat-num">{cnt}</div></div>',
                     unsafe_allow_html=True)
 
-            # detail table
-            st.markdown("<br>", unsafe_allow_html=True)
-            sec("รายการสินค้า", "📋")
-            fa,fb,fc = st.columns(3)
-            bids = sorted(items["รหัสสาขา"].dropna().unique().astype(int).tolist())
-            with fa: sel_b = st.multiselect("🏪 สาขา",bids,default=bids,key="sb1",format_func=lambda x:f"สาขา {x}")
-            with fb: sel_c = st.multiselect("🏷️ ประเภท",list(CATEGORIES.keys()),default=list(CATEGORIES.keys()),key="sc1")
-            with fc: srch  = st.text_input("🔍 ค้นหา",placeholder="ชื่อสินค้า...",key="sr1")
-            filt = items[items["รหัสสาขา"].isin(sel_b)&items["ประเภทสินค้า"].isin(sel_c)].copy()
-            if srch: filt = filt[filt["ชื่อสินค้า"].str.contains(srch,na=False,case=False)]
-            cols = ["รหัสสาขา","วันที่","ชื่อสินค้า","ประเภทสินค้า","จำนวน","ราคาต่อหน่วย","ยอดรวมสินค้า"]
-            def hl(v): m=CATEGORIES.get(v,{"color":"#9E9E9E"}); return f"background:{m['color']}15;color:{m['color']};font-weight:700"
-            st.dataframe(filt[cols].style.map(hl,subset=["ประเภทสินค้า"])
-                         .format({"จำนวน":"{:.0f}","ราคาต่อหน่วย":"฿{:,.2f}","ยอดรวมสินค้า":"฿{:,.2f}"}),
-                         use_container_width=True, hide_index=True, height=400)
-            st.caption(f"แสดง **{len(filt):,}** จาก **{len(items):,}** รายการ")
-
             # branch tabs
             st.markdown("<br>", unsafe_allow_html=True)
             sec("สรุปรายสาขา","🏪")
@@ -635,6 +600,45 @@ with tab1:
                     c1,c2=st.columns([1.2,1])
                     with c1: st.bar_chart(bd.set_index("ประเภทสินค้า")["จำนวนรายการ"],color="#FF4D6D",height=240)
                     with c2: st.dataframe(bd[["ประเภทสินค้า","จำนวนรายการ","ยอดรวม"]].style.format({"ยอดรวม":"฿{:,.2f}"}),use_container_width=True,hide_index=True,height=240)
+
+    # ── ปุ่ม AI + ตารางรายการ เต็มหน้า (นอก columns) ──
+    if st.session_state.analyzed and st.session_state.df is not None:
+        prods   = st.session_state.df["ชื่อสินค้า"].dropna().unique().tolist()
+        need_ai = [p for p in prods if st.session_state.cat_map.get(p)=="สินค้าเบ็ดเตล็ด" and not rule_classify(p)]
+        if need_ai:
+            c_info, c_btn = st.columns([2,1])
+            c_info.info(f"มี **{len(need_ai)}** รายการไม่แน่ใจ — กด AI เพื่อเพิ่มความแม่นยำ")
+            if c_btn.button("🤖 วิเคราะห์เพิ่มด้วย Gemini AI", use_container_width=True, key="btn_ai"):
+                new_map = classify_with_ai(prods, api_key, st.session_state.cat_map)
+                st.session_state.cat_map = new_map
+                still = [p for p in prods if new_map.get(p)=="สินค้าเบ็ดเตล็ด" and not rule_classify(p)]
+                st.session_state.ai_done = len(still)==0
+                st.rerun()
+        else:
+            st.success("✅ วิเคราะห์ครบทุกรายการแล้ว 🎉")
+        if st.session_state.ai_done:
+            st.success("🎉 AI วิเคราะห์ครบทุกรายการแล้ว!")
+            st.session_state.ai_done = False
+
+        # ── ตารางรายการเต็มหน้า ──
+        df2 = st.session_state.df.copy()
+        df2["ประเภทสินค้า"] = df2["ชื่อสินค้า"].map(st.session_state.cat_map)
+        items2 = df2[df2["ชื่อสินค้า"].notna()].copy()
+        st.markdown("<br>", unsafe_allow_html=True)
+        sec("รายการสินค้าทั้งหมด","📋")
+        fa,fb,fc = st.columns(3)
+        bids2 = sorted(items2["รหัสสาขา"].dropna().unique().astype(int).tolist())
+        with fa: sel_b2 = st.multiselect("🏪 สาขา",bids2,default=bids2,key="sb1",format_func=lambda x:f"สาขา {x}")
+        with fb: sel_c2 = st.multiselect("🏷️ ประเภท",list(CATEGORIES.keys()),default=list(CATEGORIES.keys()),key="sc1")
+        with fc: srch2  = st.text_input("🔍 ค้นหา",placeholder="ชื่อสินค้า...",key="sr1")
+        filt2 = items2[items2["รหัสสาขา"].isin(sel_b2)&items2["ประเภทสินค้า"].isin(sel_c2)].copy()
+        if srch2: filt2 = filt2[filt2["ชื่อสินค้า"].str.contains(srch2,na=False,case=False)]
+        showcols = ["รหัสสาขา","วันที่","ชื่อสินค้า","ประเภทสินค้า","จำนวน","ราคาต่อหน่วย","ยอดรวมสินค้า"]
+        def hl2(v): m=CATEGORIES.get(v,{"color":"#9E9E9E"}); return f"background:{m['color']}15;color:{m['color']};font-weight:700"
+        st.dataframe(filt2[showcols].style.map(hl2,subset=["ประเภทสินค้า"])
+                     .format({"จำนวน":"{:.0f}","ราคาต่อหน่วย":"฿{:,.2f}","ยอดรวมสินค้า":"฿{:,.2f}"}),
+                     use_container_width=True, hide_index=True, height=480)
+        st.caption(f"แสดง **{len(filt2):,}** จาก **{len(items2):,}** รายการ")
 
 # ══════════════════════════════════
 # TAB 2 — เปรียบเทียบเดือนก่อน
