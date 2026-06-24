@@ -593,6 +593,7 @@ with tab1:
             st.markdown("<br>", unsafe_allow_html=True)
             sec("สรุปรายสาขา","🏪")
             bdf2 = make_branch_summary(items)
+            bids = sorted(items["รหัสสาขา"].dropna().unique().astype(int).tolist())
             tabs_b = st.tabs([f"🏪 {b}" for b in bids])
             for tab,b in zip(tabs_b,bids):
                 with tab:
