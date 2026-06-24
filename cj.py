@@ -571,37 +571,6 @@ with tab1:
                              unsafe_allow_html=True)
             st.markdown("<br>", unsafe_allow_html=True)
 
-            # category bars
-            sec("สัดส่วนตามหมวดหมู่", "📊")
-            max_cnt = int(summary_df["จำนวนรายการ"].max()) or 1
-            for _, row in summary_df.iterrows():
-                cat  = row["ประเภทสินค้า"]; cnt=int(row["จำนวนรายการ"])
-                tot  = float(row["ยอดรวม"]) if pd.notna(row["ยอดรวม"]) else 0
-                meta = CATEGORIES.get(cat,{"icon":"📦","color":"#9E9E9E"})
-                pct  = cnt/max_cnt*100
-                st.markdown(
-                    f'<div class="cat-card">'
-                    f'<div class="cat-icon">{meta["icon"]}</div>'
-                    f'<div style="flex:1"><div class="cat-name">{cat}</div>'
-                    f'<div class="cat-count">฿{tot:,.0f}</div>'
-                    f'<div class="bar-wrap" style="margin-top:5px">'
-                    f'<div class="bar-fill" style="width:{pct}%;background:{meta["color"]}"></div>'
-                    f'</div></div><div class="cat-num">{cnt}</div></div>',
-                    unsafe_allow_html=True)
-
-            # branch tabs
-            st.markdown("<br>", unsafe_allow_html=True)
-            sec("สรุปรายสาขา","🏪")
-            bdf2 = make_branch_summary(items)
-            bids = sorted(items["รหัสสาขา"].dropna().unique().astype(int).tolist())
-            tabs_b = st.tabs([f"🏪 {b}" for b in bids])
-            for tab,b in zip(tabs_b,bids):
-                with tab:
-                    bd=bdf2[bdf2["รหัสสาขา"]==b]
-                    c1,c2=st.columns([1.2,1])
-                    with c1: st.bar_chart(bd.set_index("ประเภทสินค้า")["จำนวนรายการ"],color="#FF4D6D",height=240)
-                    with c2: st.dataframe(bd[["ประเภทสินค้า","จำนวนรายการ","ยอดรวม"]].style.format({"ยอดรวม":"฿{:,.2f}"}),use_container_width=True,hide_index=True,height=240)
-
     # ── ปุ่ม AI + ตารางรายการ เต็มหน้า (นอก columns) ──
     if st.session_state.analyzed and st.session_state.df is not None:
         prods   = st.session_state.df["ชื่อสินค้า"].dropna().unique().tolist()
@@ -640,6 +609,56 @@ with tab1:
                      .format({"จำนวน":"{:.0f}","ราคาต่อหน่วย":"฿{:,.2f}","ยอดรวมสินค้า":"฿{:,.2f}"}),
                      use_container_width=True, hide_index=True, height=480)
         st.caption(f"แสดง **{len(filt2):,}** จาก **{len(items2):,}** รายการ")
+
+        # ── สัดส่วนตามหมวดหมู่ เต็มหน้า ──
+        st.markdown("<br>", unsafe_allow_html=True)
+        sec("สัดส่วนตามหมวดหมู่","📊")
+        summary_df2 = make_summary(items2)
+        col_bars, col_tbl = st.columns([1, 1], gap="large")
+        with col_bars:
+            max_cnt2 = int(summary_df2["จำนวนรายการ"].max()) or 1
+            for _, row in summary_df2.iterrows():
+                cat  = row["ประเภทสินค้า"]; cnt=int(row["จำนวนรายการ"])
+                tot  = float(row["ยอดรวม"]) if pd.notna(row["ยอดรวม"]) else 0
+                meta = CATEGORIES.get(cat,{"icon":"📦","color":"#9E9E9E"})
+                pct  = cnt/max_cnt2*100
+                st.markdown(
+                    f'<div class="cat-card">'
+                    f'<div class="cat-icon">{meta["icon"]}</div>'
+                    f'<div style="flex:1"><div class="cat-name">{cat}</div>'
+                    f'<div class="cat-count">฿{tot:,.0f}</div>'
+                    f'<div class="bar-wrap" style="margin-top:5px">'
+                    f'<div class="bar-fill" style="width:{pct}%;background:{meta["color"]}"></div>'
+                    f'</div></div><div class="cat-num">{cnt}</div></div>',
+                    unsafe_allow_html=True)
+        with col_tbl:
+            st.dataframe(
+                summary_df2.style
+                    .format({"จำนวนรายการ":"{:,.0f}","ยอดรวม":"฿{:,.2f}"})
+                    .apply(lambda col: [
+                        f"background:{CATEGORIES.get(v,{'color':'#9E9E9E'})['color']}15;"
+                        f"color:{CATEGORIES.get(v,{'color':'#9E9E9E'})['color']};font-weight:700"
+                        if col.name=="ประเภทสินค้า" else "" for v in col], axis=0),
+                use_container_width=True, hide_index=True, height=380)
+
+        # ── สรุปรายสาขา เต็มหน้า ──
+        st.markdown("<br>", unsafe_allow_html=True)
+        sec("สรุปรายสาขา","🏪")
+        bdf3  = make_branch_summary(items2)
+        bids3 = sorted(items2["รหัสสาขา"].dropna().unique().astype(int).tolist())
+        tabs_b3 = st.tabs([f"🏪 สาขา {b}" for b in bids3])
+        for tab,b in zip(tabs_b3,bids3):
+            with tab:
+                bd = bdf3[bdf3["รหัสสาขา"]==b]
+                c1,c2 = st.columns([1.4,1])
+                with c1:
+                    st.bar_chart(bd.set_index("ประเภทสินค้า")["จำนวนรายการ"],
+                                 color="#FF4D6D", height=300)
+                with c2:
+                    st.dataframe(
+                        bd[["ประเภทสินค้า","จำนวนรายการ","ยอดรวม"]]
+                        .style.format({"ยอดรวม":"฿{:,.2f}"}),
+                        use_container_width=True, hide_index=True, height=300)
 
 # ══════════════════════════════════
 # TAB 2 — เปรียบเทียบเดือนก่อน
