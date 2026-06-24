@@ -348,12 +348,16 @@ with right:
 
         # ── Download button (top) ──
         summary_df = items.groupby("ประเภทสินค้า").agg(
-            จำนวนรายการ=("ชื่อสินค้า","count"), ยอดรวม=("ยอดรวมสินค้า","sum")
-        ).reset_index().sort_values("จำนวนรายการ", ascending=False)
+            count=("ชื่อสินค้า","count"), total=("ยอดรวมสินค้า","sum")
+        ).reset_index()
+        summary_df.columns = ["ประเภทสินค้า","จำนวนรายการ","ยอดรวม"]
+        summary_df = summary_df.sort_values("จำนวนรายการ", ascending=False)
 
         branch_df = items.groupby(["รหัสสาขา","ประเภทสินค้า"]).agg(
-            จำนวนรายการ=("ชื่อสินค้า","count"), ยอดรวม=("ยอดรวมสินค้า","sum")
-        ).reset_index().sort_values(["รหัสสาขา","จำนวนรายการ"], ascending=[True,False])
+            count=("ชื่อสินค้า","count"), total=("ยอดรวมสินค้า","sum")
+        ).reset_index()
+        branch_df.columns = ["รหัสสาขา","ประเภทสินค้า","จำนวนรายการ","ยอดรวม"]
+        branch_df = branch_df.sort_values(["รหัสสาขา","จำนวนรายการ"], ascending=[True,False])
 
         map_df = pd.DataFrame(sorted(cat_map.items(), key=lambda x:x[1]),
                               columns=["ชื่อสินค้า","ประเภทสินค้า"])
@@ -454,8 +458,9 @@ if st.session_state.analyzed and st.session_state.df is not None:
     st.markdown("<br>", unsafe_allow_html=True)
     sec("สรุปรายสาขา", "🏪")
     branch_df2 = items.groupby(["รหัสสาขา","ประเภทสินค้า"]).agg(
-        จำนวนรายการ=("ชื่อสินค้า","count"), ยอดรวม=("ยอดรวมสินค้า","sum")
+        count=("ชื่อสินค้า","count"), total=("ยอดรวมสินค้า","sum")
     ).reset_index()
+    branch_df2.columns = ["รหัสสาขา","ประเภทสินค้า","จำนวนรายการ","ยอดรวม"]
 
     tabs = st.tabs([f"🏪 สาขา {b}" for b in branch_ids])
     for tab, b in zip(tabs, branch_ids):
