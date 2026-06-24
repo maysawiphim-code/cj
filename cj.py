@@ -203,10 +203,16 @@ def make_branch_summary(items):
     return df.reset_index().sort_values(["รหัสสาขา","จำนวนรายการ"], ascending=[True,False])
 
 def make_monthly_top(items):
-    cat_grp = items.groupby(["เดือน_sort","รหัสสาขา","ประเภทสินค้า"])["ชื่อสินค้า"].count().reset_index()
+    df = items.copy()
+    # สร้างคอลัมน์เดือนถ้ายังไม่มี
+    if "เดือน_sort" not in df.columns:
+        df["วันที่_dt"]  = pd.to_datetime(df["วันที่"], format="%d/%m/%Y", errors="coerce")
+        df["เดือน_sort"] = df["วันที่_dt"].dt.to_period("M").astype(str)
+        df["เดือน"]      = df["วันที่_dt"].dt.strftime("%b %Y")
+    cat_grp = df.groupby(["เดือน_sort","รหัสสาขา","ประเภทสินค้า"])["ชื่อสินค้า"].count().reset_index()
     cat_grp = cat_grp.sort_values("ชื่อสินค้า",ascending=False).drop_duplicates(["เดือน_sort","รหัสสาขา"])
     cat_grp = cat_grp.rename(columns={"ชื่อสินค้า":"_c","ประเภทสินค้า":"top_cat"})
-    grp = items.groupby(["เดือน_sort","เดือน","รหัสสาขา"])
+    grp = df.groupby(["เดือน_sort","เดือน","รหัสสาขา"])
     m   = pd.concat([grp["ชื่อสินค้า"].count(), grp["ยอดรวมสินค้า"].sum()], axis=1).reset_index()
     m.columns = ["เดือน_sort","เดือน","รหัสสาขา","จำนวนรายการ","ยอดรวม"]
     m = m.merge(cat_grp[["เดือน_sort","รหัสสาขา","top_cat"]], on=["เดือน_sort","รหัสสาขา"], how="left")
