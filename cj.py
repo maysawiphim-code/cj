@@ -325,7 +325,7 @@ if st.session_state.analyzed and st.session_state.df is not None:
         return f"background-color:{meta['color']}22;color:{meta['color']};font-weight:600"
 
     styled = filtered[cols].style\
-        .applymap(highlight_cat, subset=["ประเภทสินค้า"])\
+        .map(highlight_cat, subset=["ประเภทสินค้า"])\
         .format({"จำนวน":"{:.0f}","ราคาต่อหน่วย":"฿{:,.2f}","ยอดรวมสินค้า":"฿{:,.2f}"})
 
     st.dataframe(styled, use_container_width=True, hide_index=True, height=420)
