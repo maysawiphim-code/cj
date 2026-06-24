@@ -1,4 +1,3 @@
 streamlit
 pandas
-openpyxl   ← ที่ขาดอยู่
-xlsxwriter 
+openpyxl
