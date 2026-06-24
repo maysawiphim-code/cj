@@ -115,16 +115,33 @@ def get_api_key():
 
 def claude_classify(products, api_key):
     payload = json.dumps({
-        "model":"claude-sonnet-4-6","max_tokens":2000,
-        "system":SYSTEM_PROMPT,
-        "messages":[{"role":"user","content":"วิเคราะห์:\n"+"\n".join(f"- {p}" for p in products)}],
-    }).encode()
+        "model": "claude-sonnet-4-6",
+        "max_tokens": 2000,
+        "system": SYSTEM_PROMPT,
+        "messages": [{
+            "role": "user",
+            "content": "วิเคราะห์ประเภทสินค้าต่อไปนี้:\n" +
+                       "\n".join(f"- {p}" for p in products)
+        }],
+    }, ensure_ascii=False).encode("utf-8")
+
     req = urllib.request.Request(
-        "https://api.anthropic.com/v1/messages", data=payload,
-        headers={"Content-Type":"application/json","x-api-key":api_key,"anthropic-version":"2023-06-01"})
-    with urllib.request.urlopen(req, timeout=60) as r:
-        data = json.loads(r.read())
-    raw = re.sub(r"```json|```","",data["content"][0]["text"]).strip()
+        "https://api.anthropic.com/v1/messages",
+        data=payload,
+        headers={
+            "Content-Type": "application/json; charset=utf-8",
+            "x-api-key": api_key,
+            "anthropic-version": "2023-06-01",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=60) as r:
+            data = json.loads(r.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        err_body = e.read().decode("utf-8")
+        raise Exception(f"API {e.code}: {err_body[:300]}")
+
+    raw = re.sub(r"```json|```", "", data["content"][0]["text"]).strip()
     return json.loads(raw)
 
 def classify_all(products, api_key):
