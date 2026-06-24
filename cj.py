@@ -143,17 +143,85 @@ def claude_classify(products, api_key):
     raw = re.sub(r"```json|```", "", raw).strip()
     return json.loads(raw)
 
+# ─── RULE-BASED FALLBACK (ไม่ต้องใช้ API) ───
+RULE_KEYWORDS = {
+    "Bao Cafe":        ["bao_","bao ","bac_","bac ","เอสเปรสโซ","ลาเต้","อเมริกาโน","มัทฉะ","อาราบีก้า"],
+    "อาหารพร้อมทาน":  ["ปัง","แซนด์วิช","ไส้กรอก","พุดดิ้ง","ข้าวเกรียบ","ผงชูรส","ไข่","แฮม","มินิบัน","เบเกอรี"],
+    "เครื่องดื่ม":     ["น้ํา","น้ำ","นม","เบียร์","สุรา","โคล่า","โซดา","คอลลาเจน","โพรไบโอ","ชูกำลัง","เฮล","วิตซี","ซีวิท"],
+    "ขนมขบเคี้ยว":    ["มันฝรั่ง","ลูกอม","ช็อก","ไอศกรีม","ถั่ว","เมล็ด","อัลมอนด์","ข้าวโพด","ทวิสโก้","คอนเน่","บันบัน","ซาซ่า","กินดะ","โรซี่","โคอาล่า","ตะวันขนม","ฟู่อารี่","เทสโต","เลยร้อย","เลยร็อค"],
+    "ของใช้ส่วนตัว":  ["ยาสีฟัน","แชมพู","สบู่","ครีม","ผ้าอนามัย","โฟม","รองพื้น","แปรง","เดนทีน","บีโอเร","การ์นิเย่","สกินแสบ","เจเล","แพนดิน","สุภาภรณ์","เอล สมูธ","mbl","bigsml"],
+    "ของใช้ในบ้าน":   ["ทิชชู","ผงซัก","น้ำยา","ถุงขยะ","ดาวน์นี่","วิกซอล","ปรับผ้า"],
+    "สินค้าเบ็ดเตล็ด":["ถ่าน","ไฟแช็ก","ยากันยุง","เครื่องเขียน","เทปลบ","พานาโซนิค","ดราช่าง","เรนเจอร์"],
+    "บริการและอื่นๆ": ["เติมเงิน","จ่ายบิล","ซิมการ์ด","บัตรเติม","ส่วนลด","แก้วลูกค้า","00"],
+}
+
+def rule_classify(name: str) -> str:
+    n = str(name).lower()
+    for cat, kws in RULE_KEYWORDS.items():
+        if any(k.lower() in n for k in kws):
+            return cat
+    return ""   # ไม่รู้ → ส่งให้ AI
+
 def classify_all(products, api_key):
-    result, batch_size = {}, 20
-    batches = [products[i:i+batch_size] for i in range(0,len(products),batch_size)]
-    bar = st.progress(0); status = st.empty()
+    import time, hashlib
+
+    # ── ขั้น 1: rule-based ก่อน ──
+    result   = {}
+    need_ai  = []
+    for p in products:
+        cat = rule_classify(p)
+        if cat:
+            result[p] = cat
+        else:
+            need_ai.append(p)
+
+    total = len(products)
+    bar    = st.progress(0)
+    status = st.empty()
+    status.markdown(f"⚡ Rule-based: จำแนกได้ **{len(result)}/{total}** รายการ "
+                    f"| ส่ง AI อีก **{len(need_ai)}** รายการ")
+    bar.progress(len(result)/total if total else 1)
+
+    if not need_ai:
+        bar.empty(); status.empty()
+        return result
+
+    # ── ขั้น 2: ส่ง AI เฉพาะที่ rule ไม่รู้ ──
+    batch_size = 30
+    batches    = [need_ai[i:i+batch_size] for i in range(0, len(need_ai), batch_size)]
+    done_ai    = 0
+
     for i, batch in enumerate(batches):
-        status.markdown(f"🤖 วิเคราะห์ **{min((i+1)*batch_size,len(products))}/{len(products)}** รายการ...")
-        try: result.update(claude_classify(batch, api_key))
-        except Exception as e:
-            st.warning(f"Batch {i+1}: {e}")
-            for p in batch: result[p] = "สินค้าเบ็ดเตล็ด"
-        bar.progress((i+1)/len(batches))
+        status.markdown(f"🤖 AI วิเคราะห์ **{done_ai}/{len(need_ai)}** รายการ "
+                        f"(batch {i+1}/{len(batches)})...")
+        retry = 0
+        while retry < 3:
+            try:
+                result.update(claude_classify(batch, api_key))
+                done_ai += len(batch)
+                break
+            except Exception as e:
+                err = str(e)
+                if "429" in err or "quota" in err.lower():
+                    wait = (retry + 1) * 20
+                    status.markdown(f"⏳ Rate limit — รอ **{wait} วิ** (retry {retry+1}/3)...")
+                    time.sleep(wait)
+                    retry += 1
+                else:
+                    # error อื่น → fallback rule แล้วไปต่อ
+                    st.warning(f"Batch {i+1}: {err[:150]}")
+                    for p in batch: result[p] = rule_classify(p) or "สินค้าเบ็ดเตล็ด"
+                    done_ai += len(batch)
+                    break
+        else:
+            # retry หมด → rule fallback
+            for p in batch: result[p] = rule_classify(p) or "สินค้าเบ็ดเตล็ด"
+            done_ai += len(batch)
+
+        bar.progress((len(result))/total)
+        if i < len(batches)-1:
+            time.sleep(2)
+
     bar.empty(); status.empty()
     return result
 
