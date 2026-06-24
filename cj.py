@@ -8,7 +8,6 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.chart import BarChart, PieChart, Reference
 from openpyxl.chart.series import DataPoint
-from openpyxl.chart.label import DataLabel
 
 st.set_page_config(page_title="CJ Smart Scan", page_icon="🛒", layout="wide")
 
@@ -379,7 +378,6 @@ def build_excel(df, summary, branch_df, map_df, items):
                           max_row=data_start_row+n_cats)
     pie.add_data(pie_data, titles_from_data=True)
     pie.set_categories(pie_cats)
-    pie.dataLabels = DataLabel(showPercent=True, showVal=False, showCatName=False)
     ws5.add_chart(pie, "L3")
 
     # === ตาราง TOP 10 สาขา รายเดือน ===
