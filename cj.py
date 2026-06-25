@@ -196,6 +196,38 @@ def load_excel(file):
     df["เดือน_sort"]= df["วันที่_dt"].dt.to_period("M").astype(str)
     return df
 
+def parse_receipt(df):
+    """แตกเลขที่ใบเสร็จ → เครื่องคิดเงิน + ยอดลูกค้า"""
+    import re
+    def extract(r):
+        m = re.search(r'(N\d+)-(\d+)', str(r))
+        if m: return m.group(1), int(m.group(2))
+        return None, None
+    df = df.copy()
+    parsed = df["เลขที่ใบเสร็จ"].apply(extract)
+    df["เครื่อง"]    = parsed.apply(lambda x: x[0])
+    df["ยอดลูกค้า"] = parsed.apply(lambda x: x[1])
+    return df
+
+def make_top5_branch_machines(items):
+    """Top 5 สาขา พร้อมยอดลูกค้าแยกตามเครื่องคิดเงิน"""
+    df = parse_receipt(items)
+    # ยอดรวมต่อสาขา
+    branch_tot = df.groupby("รหัสสาขา")["ยอดรวมสินค้า"].sum().sort_values(ascending=False)
+    top5 = branch_tot.head(5).index.tolist()
+    result = []
+    for bid in top5:
+        bdata = df[df["รหัสสาขา"]==bid].copy()
+        tot   = float(branch_tot[bid])
+        # max ยอดลูกค้าต่อเครื่อง = จำนวนลูกค้าสะสม
+        machines = bdata.groupby("เครื่อง")["ยอดลูกค้า"].max().sort_index()
+        result.append({
+            "รหัสสาขา": int(bid),
+            "ยอดรวม":   tot,
+            "เครื่อง":  machines.to_dict()
+        })
+    return result
+
 def make_summary(items):
     grp = items.groupby("ประเภทสินค้า")
     df  = pd.concat([grp["ชื่อสินค้า"].count(), grp["ยอดรวมสินค้า"].sum()], axis=1)
@@ -460,6 +492,67 @@ def build_excel(df, summary, branch_df, map_df, items, df_prev=None, summary_pre
         cbar.series[1].graphicalProperties.solidFill="EF5350"
         ws6.add_chart(cbar,f"A{r_idx+3}")
 
+
+    # ── Sheet 6: Top 5 สาขา + ยอดแยกเครื่อง ──
+    wb.create_sheet("Top 5 สาขา & เครื่อง")
+    ws6 = wb["Top 5 สาขา & เครื่อง"]
+    ws6.sheet_view.showGridLines = False
+    ws6.sheet_properties.tabColor = "880E4F"
+    for i in range(1, 10):
+        ws6.column_dimensions[get_column_letter(i)].width = 20
+
+    write_header(ws6, 1, 6, "🏆 Top 5 สาขาขายดี — ยอดลูกค้าแยกตามเครื่องคิดเงิน", "880E4F")
+    ws6.row_dimensions[1].height = 30
+
+    top5_data = make_top5_branch_machines(items)
+    cr6 = 3
+    rbg_list = ["FFD700","C0C0C0","CD7F32","FF6B6B","FF9F43"]
+    medals   = ["🥇","🥈","🥉","4️⃣","5️⃣"]
+
+    for rank, binfo in enumerate(top5_data):
+        bid  = binfo["รหัสสาขา"]
+        tot  = binfo["ยอดรวม"]
+        mach = binfo["เครื่อง"]
+        rbg  = rbg_list[rank]
+
+        # ── สาขา header row ──
+        ws6.merge_cells(start_row=cr6, start_column=1, end_row=cr6, end_column=6)
+        hc = ws6.cell(row=cr6, column=1,
+                      value=f"  อันดับ {rank+1}  สาขา {bid}   ยอดรวม: {tot:,.2f} บาท")
+        hc.font      = Font(bold=True, color="FFFFFF", size=12)
+        hc.fill      = PatternFill("solid", fgColor=rbg)
+        hc.alignment = Alignment(horizontal="left", vertical="center", indent=2)
+        ws6.row_dimensions[cr6].height = 26
+        cr6 += 1
+
+        # ── col headers ──
+        for j, h in enumerate(["เครื่องคิดเงิน", "ยอดลูกค้าสะสม (transaction no.)"], 1):
+            c = ws6.cell(row=cr6, column=j, value=h)
+            c.font      = Font(bold=True, color="555555", size=10)
+            c.fill      = PatternFill("solid", fgColor="FCE4EC")
+            c.alignment = Alignment(horizontal="center", vertical="center")
+            c.border    = thin_border()
+        ws6.row_dimensions[cr6].height = 20
+        cr6 += 1
+
+        # ── machine rows ──
+        for i, (mname, mval) in enumerate(sorted(mach.items())):
+            bg = "FFF8FA" if i % 2 == 0 else "FFFFFF"
+            c1 = ws6.cell(row=cr6, column=1, value=mname)
+            c2 = ws6.cell(row=cr6, column=2, value=mval)
+            c1.font      = Font(bold=True, color="C9184A", size=11)
+            c1.fill      = PatternFill("solid", fgColor=bg)
+            c1.alignment = Alignment(horizontal="center", vertical="center")
+            c1.border    = thin_border()
+            c2.font      = Font(color="333333", size=10)
+            c2.fill      = PatternFill("solid", fgColor=bg)
+            c2.alignment = Alignment(horizontal="center", vertical="center")
+            c2.border    = thin_border()
+            ws6.row_dimensions[cr6].height = 20
+            cr6 += 1
+
+        cr6 += 1  # spacer
+
     out = io.BytesIO(); wb.save(out); return out.getvalue()
 
 # ═══════════════════════════════════════════
@@ -467,7 +560,7 @@ def build_excel(df, summary, branch_df, map_df, items, df_prev=None, summary_pre
 # ═══════════════════════════════════════════
 for k,v in [("df",None),("cat_map",{}),("analyzed",False),("_file_id",""),
              ("df_prev",None),("cat_map_prev",{}),("analyzed_prev",False),("_file_id_prev",""),
-             ("ai_done",False)]:
+             ("ai_done",False),("ai_status",""),("ai_remaining",0)]:
     if k not in st.session_state: st.session_state[k] = v
 
 api_key = get_api_key()
@@ -581,20 +674,30 @@ with tab1:
     if st.session_state.analyzed and st.session_state.df is not None:
         prods   = st.session_state.df["ชื่อสินค้า"].dropna().unique().tolist()
         need_ai = [p for p in prods if st.session_state.cat_map.get(p)=="สินค้าเบ็ดเตล็ด" and not rule_classify(p)]
+        if st.session_state.get("ai_status") == "done":
+            st.success("🎉 AI วิเคราะห์ครบทุกรายการแล้ว! ไม่มีรายการค้างอีกแล้ว")
+            st.session_state.ai_status = ""
+        elif st.session_state.get("ai_status") == "partial":
+            remaining = st.session_state.get("ai_remaining", 0)
+            st.warning(f"⚠️ AI วิเคราะห์เสร็จแล้ว แต่ยังมี **{remaining}** รายการที่ไม่แน่ใจ (อาจเกิน rate limit)")
+            st.session_state.ai_status = ""
+
         if need_ai:
             c_info, c_btn = st.columns([2,1])
             c_info.info(f"มี **{len(need_ai)}** รายการไม่แน่ใจ — กด AI เพื่อเพิ่มความแม่นยำ")
             if c_btn.button("🤖 วิเคราะห์เพิ่มด้วย Gemini AI", use_container_width=True, key="btn_ai"):
-                new_map = classify_with_ai(prods, api_key, st.session_state.cat_map)
+                with st.spinner("🤖 กำลังวิเคราะห์..."):
+                    new_map = classify_with_ai(prods, api_key, st.session_state.cat_map)
                 st.session_state.cat_map = new_map
                 still = [p for p in prods if new_map.get(p)=="สินค้าเบ็ดเตล็ด" and not rule_classify(p)]
-                st.session_state.ai_done = len(still)==0
+                if len(still) == 0:
+                    st.session_state.ai_status = "done"
+                else:
+                    st.session_state.ai_status = "partial"
+                    st.session_state.ai_remaining = len(still)
                 st.rerun()
         else:
             st.success("✅ วิเคราะห์ครบทุกรายการแล้ว 🎉")
-        if st.session_state.ai_done:
-            st.success("🎉 AI วิเคราะห์ครบทุกรายการแล้ว!")
-            st.session_state.ai_done = False
 
         # ── ตารางรายการเต็มหน้า ──
         df2 = st.session_state.df.copy()
