@@ -679,13 +679,11 @@ with tab1:
         with col_cust:
             top_cust = cust_b2.sort_values("ยอดลูกค้าสะสม", ascending=False).head(20)
             st.dataframe(top_cust.style
-                         .format({"ยอดลูกค้าสะสม":"{:,.0f}"})
-                         .background_gradient(subset=["ยอดลูกค้าสะสม"], cmap="Blues"),
+                         .format({"ยอดลูกค้าสะสม":"{:,.0f}"}),
                          use_container_width=True, hide_index=True, height=400)
         with col_mach:
             st.dataframe(cust_m2.sort_values(["รหัสสาขา","เครื่อง"])
-                         .style.format({"ยอดลูกค้า":"{:,.0f}"})
-                         .background_gradient(subset=["ยอดลูกค้า"], cmap="Purples"),
+                         .style.format({"ยอดลูกค้า":"{:,.0f}"}),
                          use_container_width=True, hide_index=True, height=400)
 
         # สัดส่วน PMA
