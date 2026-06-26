@@ -116,16 +116,54 @@ RANK_BG    = ["FFD700","C0C0C0","CD7F32","FF6B6B","FF9F43","48DBFB","1DD1A1","A2
 RANK_MEDAL = ["🥇","🥈","🥉","4","5","6","7","8","9","10"]
 
 SYSTEM_PROMPT = """คุณคือระบบจำแนกประเภทสินค้าร้าน CJ Express ตามกลุ่ม PMA
-วิเคราะห์จากชื่อสินค้าเท่านั้น ตอบ JSON เท่านั้น: {"ชื่อสินค้า":"หมวดหมู่"}
+วิเคราะห์จากชื่อสินค้าเท่านั้น ตอบ JSON เท่านั้น ห้ามมีข้อความอื่น: {"ชื่อสินค้า":"หมวดหมู่"}
 
-หมวดหมู่ที่ใช้ได้ (เลือกได้เฉพาะ 7 หมวดนี้):
-1. Bao Cafe — เครื่องดื่ม Bao ทุกชนิด (ลาเต้ อเมริกาโน่ โกโก้ ฯลฯ)
-2. Fresh Food — อาหารสด อาหารพร้อมทาน ขนมปัง แซนด์วิช ไส้กรอก นมพาสเจอร์ไรส์
-3. Non Food — ของใช้ส่วนตัว ของใช้ในบ้าน เครื่องเขียน บุหรี่ อิเล็กทรอนิกส์
-4. Packaged Beverage — เครื่องดื่มบรรจุขวด/กล่อง น้ำอัดลม นม UHT เบียร์ ไวน์ สุรา ไอศกรีม น้ำแข็ง เครื่องดื่มชูกำลัง
-5. Processed Food — อาหารแปรรูป บะหมี่กึ่งสำเร็จรูป ขนมขบเคี้ยว ลูกอม ช็อกโกแลต ของหวาน
-6. Special Business — ยา อาหารเสริม บริการ เติมเงิน ผัก เบเกอรี่พิเศษ
-7. ส่วนลด/โปรโมชั่น — ส่วนลดและโปรโมชั่นเท่านั้น"""
+หมวดหมู่ที่ใช้ได้ (เลือกได้เฉพาะ 7 หมวดนี้เท่านั้น ห้ามสร้างหมวดใหม่):
+
+1. Bao Cafe
+   - เครื่องดื่ม Bao ทุกชนิด: Bao_ลาเต้, Bao_อเมริกาโน่, Bao_โกโก้, Bao_ชาเขียว, Bao_มัทฉะ
+   - ชื่อขึ้นต้นด้วย Bao หรือ Bac ตามด้วยชื่อเครื่องดื่ม
+
+2. Fresh Food
+   - อาหารสด อาหารพร้อมทาน: ข้าวกล่อง แซนด์วิช เบอร์เกอร์ ไส้กรอก ลูกชิ้น
+   - ขนมปัง เบเกอรี่ (ที่ไม่ใช่ Bellinee): bread, sandwich bread, package bakery
+   - นมพาสเจอร์ไรส์: นมสด, pasteurized milk, นมถุง
+   - อาหารแช่เย็น/แช่แข็ง: frozen, chilled, อาหารพร้อมปรุง
+   - สลัด, ผลไม้แช่เย็น
+
+3. Non Food
+   - ของใช้ส่วนตัว: แชมพู สบู่ ยาสีฟัน ครีม โฟมล้างหน้า ผ้าอนามัย ยาระงับเหงื่อ
+   - ของใช้ในบ้าน: ทิชชู ผงซักฟอก น้ำยาล้างจาน น้ำยาปรับผ้านุ่ม ถุงขยะ
+   - บุหรี่: บุหรี่ไทย บุหรี่นำเข้า ซิกาแรต
+   - เครื่องเขียน: ปากกา ดินสอ สมุด กรรไกร เทปลบ
+   - อิเล็กทรอนิกส์: สายชาร์จ หูฟัง แบตสำรอง ถ่านไฟฉาย
+
+4. Packaged Beverage
+   - น้ำดื่มบรรจุขวด: น้ำเปล่า น้ำแร่
+   - นม UHT: นมกล่อง, UHT, ดัชมิลล์, โฟร์โมสต์, ไวตามิลค์
+   - น้ำอัดลม: โค้ก เป๊ปซี่ สไปรท์ แฟนต้า โซดา
+   - เครื่องดื่มชูกำลัง: คาราบาว กระทิงแดง เรดบูล M150 ชาร์จ
+   - ชา กาแฟพร้อมดื่ม: โออิชิ ลิปตัน เนสกาแฟ (กล่อง/ขวด)
+   - น้ำผลไม้ น้ำหวาน โพลาริส
+   - เบียร์ สุรา ไวน์ RTD alcohol
+   - ไอศกรีม น้ำแข็ง
+
+5. Processed Food
+   - บะหมี่กึ่งสำเร็จรูป: มาม่า ไวไว ยำยำ Mie Sedap
+   - ขนมขบเคี้ยว: มันฝรั่ง เลย์ ปริงเกิ้ล คอร์นเนตโต ข้าวโพดอบ
+   - ขนมหวาน: ลูกอม ช็อกโกแลต เยลลี่ กัมมี่ คุกกี้ เวเฟอร์
+   - ของหวาน/ของว่าง: ถั่ว อัลมอนด์ ผลไม้อบ ข้าวอบ
+   - อาหารกระป๋อง: ปลากระป๋อง ซอสพร้อมปรุง
+
+6. Special Business
+   - ยาและเวชภัณฑ์: ยาแก้ปวด ยาลดไข้ พาราเซตามอล วิตามิน อาหารเสริม
+   - บริการ: เติมเงิน จ่ายบิล ซิมการ์ด บัตรเติมเงิน
+   - ผักสด: ผักต่างๆ
+   - Bellinee: เบเกอรี่ Bellinee, Kudsan
+   - สินค้าพิเศษ: Social Welfare, Supply
+
+7. ส่วนลด/โปรโมชั่น
+   - ส่วนลด โปรโมชั่น แถม Discount"""
 
 # ═══════════════════════════════════════════
 # HELPERS
@@ -146,7 +184,7 @@ def rule_classify(name):
     return ""
 
 def classify_rule_only(products):
-    return {p: rule_classify(p) or "Processed Food" for p in products}
+    return {p: rule_classify(p) or "" for p in products}
 
 def gemini_classify(products, api_key):
     product_list = "\n".join(f"- {p}" for p in products)
@@ -587,9 +625,23 @@ with tab1:
             st.success(f"✅ พบ **{n}** รายการ จาก **{b}** สาขา")
 
         if st.session_state.df is not None and not st.session_state.analyzed:
-            if st.button("⚡ จำแนกสินค้าทันที", type="primary", use_container_width=True):
+            if st.button("🤖 วิเคราะห์ด้วย AI", type="primary", use_container_width=True):
                 prods = st.session_state.df["ชื่อสินค้า"].dropna().unique().tolist()
-                st.session_state.cat_map  = classify_rule_only(prods)
+                # Step 1: rule-based ก่อน
+                base_map = classify_rule_only(prods)
+                if api_key:
+                    # Step 2: AI วิเคราะห์ทุกรายการที่ rule ไม่รู้จัก
+                    with st.spinner("🤖 Gemini AI กำลังวิเคราะห์หมวดหมู่..."):
+                        base_map = classify_with_ai(prods, api_key, base_map)
+                    # Step 3: fallback รายที่ยังไม่มี
+                    for p in prods:
+                        if not base_map.get(p) or base_map[p] not in CATEGORIES:
+                            base_map[p] = rule_classify(p) or "Processed Food"
+                else:
+                    for p in prods:
+                        if not base_map.get(p):
+                            base_map[p] = "Processed Food"
+                st.session_state.cat_map  = base_map
                 st.session_state.analyzed = True
                 st.rerun()
 
@@ -652,24 +704,22 @@ with tab1:
         items2 = df2[df2["ชื่อสินค้า"].notna()].copy()
         cust_b2, cust_m2 = get_customer_count(items2)
 
-        # AI button
-        prods   = st.session_state.df["ชื่อสินค้า"].dropna().unique().tolist()
-        need_ai = [p for p in prods if not rule_classify(p)]
-        if st.session_state.get("ai_status") == "done":
-            st.success("🎉 AI วิเคราะห์ครบทุกรายการแล้ว!")
-            st.session_state.ai_status = ""
-        if need_ai and api_key:
-            c_info, c_btn = st.columns([2,1])
-            c_info.info(f"มี **{len(need_ai)}** รายการยังไม่แน่ใจหมวดหมู่ — กด AI เพื่อเพิ่มความแม่นยำ")
-            if c_btn.button("🤖 วิเคราะห์ด้วย Gemini AI", use_container_width=True):
+        # แสดงสถานะการวิเคราะห์
+        prods = st.session_state.df["ชื่อสินค้า"].dropna().unique().tolist()
+        unknown = [p for p in prods if not st.session_state.cat_map.get(p) or
+                   st.session_state.cat_map.get(p) not in CATEGORIES]
+        if unknown:
+            st.warning(f"⚠️ มี **{len(unknown)}** รายการที่ยังไม่ได้จำแนก")
+            if api_key and st.button("🔄 วิเคราะห์รายการที่เหลือด้วย AI", use_container_width=True):
                 with st.spinner("🤖 กำลังวิเคราะห์..."):
                     new_map = classify_with_ai(prods, api_key, st.session_state.cat_map)
+                    for p in prods:
+                        if not new_map.get(p) or new_map[p] not in CATEGORIES:
+                            new_map[p] = "Processed Food"
                 st.session_state.cat_map = new_map
-                still = [p for p in prods if not rule_classify(p) and new_map.get(p) not in CATEGORIES]
-                st.session_state.ai_status = "done" if not still else "partial"
                 st.rerun()
-        elif not need_ai:
-            st.success("✅ จำแนกครบทุกรายการแล้ว 🎉")
+        else:
+            st.success("✅ AI จำแนกครบทุกรายการแล้ว 🎉")
 
         st.markdown("<br>", unsafe_allow_html=True)
         sec("👥 ยอดลูกค้าสะสมต่อสาขา","")
@@ -784,9 +834,20 @@ with tab2:
             st.success(f"✅ พบ **{n2}** รายการ จาก **{b2}** สาขา")
 
         if st.session_state.df_prev is not None and not st.session_state.analyzed_prev:
-            if st.button("⚡ จำแนกไฟล์เดือนก่อน", type="primary", use_container_width=True, key="btn_prev"):
+            if st.button("🤖 วิเคราะห์ด้วย AI", type="primary", use_container_width=True, key="btn_prev"):
                 prods2 = st.session_state.df_prev["ชื่อสินค้า"].dropna().unique().tolist()
-                st.session_state.cat_map_prev  = classify_rule_only(prods2)
+                base2  = classify_rule_only(prods2)
+                if api_key:
+                    with st.spinner("🤖 Gemini AI กำลังวิเคราะห์..."):
+                        base2 = classify_with_ai(prods2, api_key, base2)
+                    for p in prods2:
+                        if not base2.get(p) or base2[p] not in CATEGORIES:
+                            base2[p] = rule_classify(p) or "Processed Food"
+                else:
+                    for p in prods2:
+                        if not base2.get(p):
+                            base2[p] = "Processed Food"
+                st.session_state.cat_map_prev  = base2
                 st.session_state.analyzed_prev = True
                 st.rerun()
 
